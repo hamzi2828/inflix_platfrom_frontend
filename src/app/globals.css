@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* Floating UI layers: dropdowns above tables/modals, modals above overlay */
+  --z-dropdown-overlay: 9990;
+  --z-dropdown-menu: 9991;
+  --z-modal-overlay: 9998;
+  --z-modal: 9999;
+  /* Primary brand: #0052cc (replaces orange globally via theme override) */
+  --color-primary: #0052cc;
+  --color-primary-hover: #0041a3;
+  --color-primary-active: #003680;
+  --color-primary-foreground: #ffffff;
+  --color-primary-ring: #2684ff;
+  --color-primary-muted: #e6f0ff;
+  --color-primary-muted-hover: #cce0ff;
+  --color-primary-muted-foreground: #0041a3;
+  /* Dropdown/menu text contrast: semantic tokens for all menus */
+  --menu-foreground: #111827;
+  --menu-muted-foreground: #4b5563;
+  --menu-destructive: #b91c1c;
+  /* Table cell text contrast: normal values readable, secondary still visible */
+  --table-cell-foreground: #111827;
+  --table-cell-muted: #4b5563;
+  --table-header-foreground: #1f2937;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  /* Map orange-* utilities to primary blue so existing classes use #0052cc globally */
+  --color-orange-50: #e6f0ff;
+  --color-orange-100: #cce0ff;
+  --color-orange-200: #99c2ff;
+  --color-orange-300: #66a3ff;
+  --color-orange-400: #3385ff;
+  --color-orange-500: #0052cc;
+  --color-orange-600: #0041a3;
+  --color-orange-700: #003680;
+  --color-orange-800: #002b66;
+  --color-orange-900: #001f4d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Platform form fields: clearer borders and background (gray-300 border, gray-50 bg) */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    @apply bg-gray-50 border border-gray-300 text-gray-900;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply bg-white outline-none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgb(38 132 255 / 0.25);
+  }
+}
+
+/* Platform: secondary (Cancel-style) buttons always readable */
+[data-platform] button.border-gray-300:not(.bg-orange-500):not(.bg-red-500),
+[data-platform] a.border-gray-300 {
+  color: rgb(30 41 59);
+  font-weight: 500;
+}
+
+/* Dropdown/menu text contrast: ensure readable foreground everywhere (row actions, selects, popovers) */
+[role="menu"] {
+  color: var(--menu-foreground);
+}
+[role="menu"] button:not(:disabled):not(.text-red-600):not(.text-red-700),
+[role="menu"] a:not([aria-disabled="true"]):not(.text-red-600):not(.text-red-700) {
+  color: var(--menu-foreground) !important;
+}
+[role="menu"] button:disabled,
+[role="menu"] a[aria-disabled="true"] {
+  color: var(--menu-muted-foreground) !important;
+  opacity: 0.85;
+}
+[role="menu"] button.text-red-600,
+[role="menu"] button.text-red-700,
+[role="menu"] a.text-red-600,
+[role="menu"] a.text-red-700 {
+  color: var(--menu-destructive) !important;
+}
+[role="menu"] svg {
+  color: currentColor;
+}
+
+/* Table text contrast: normal cell values always readable (no faded read-only content) */
+table td {
+  color: var(--table-cell-foreground);
+}
+table th {
+  color: var(--table-header-foreground);
+}
+table td.text-gray-500,
+table td.text-gray-600,
+table td .text-gray-400,
+table td .text-gray-500,
+table td .text-gray-600 {
+  color: var(--table-cell-muted) !important;
+}

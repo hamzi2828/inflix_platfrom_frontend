@@ -19,4 +19,4 @@ Next.js (App Router + TypeScript + Tailwind) for the Platform Owner Console. Tal
 
 Root `/` redirects to `/login`.
 
-# pos_platfrom_frontend
+# inflix_platfrom_frontend
