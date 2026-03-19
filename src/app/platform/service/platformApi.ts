@@ -103,6 +103,7 @@ export interface TenantUser {
 
 export interface TenantSubscriptionDetail {
   tenantId: string;
+  subscriptionType: 'plan' | 'custom';
   planKey: string | null;
   startDate: string | null;
   expireDate: string | null;
@@ -287,7 +288,7 @@ export const platformApi = {
     const json = await res.json();
     return json.data;
   },
-  async updateTenantSubscription(tenantId: string, body: { planKey?: string; overrides?: { features?: Record<string, boolean>; limits?: Record<string, number | null> }; startDate?: string | null; expireDate?: string | null }): Promise<TenantSubscriptionDetail> {
+  async updateTenantSubscription(tenantId: string, body: { subscriptionType?: 'plan' | 'custom'; planKey?: string; overrides?: { features?: Record<string, boolean>; limits?: Record<string, number | null> }; startDate?: string | null; expireDate?: string | null }): Promise<TenantSubscriptionDetail> {
     const res = await fetch(`${API_BASE}/platform/tenants/${encodeURIComponent(tenantId)}/subscription`, { method: "PUT", headers: getPlatformAuthHeaders(), body: JSON.stringify(body) });
     if (!res.ok) throw new Error(await res.json().then((j) => j.message).catch(() => "Failed"));
     const json = await res.json();

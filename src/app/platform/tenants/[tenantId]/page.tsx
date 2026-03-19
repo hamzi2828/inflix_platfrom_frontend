@@ -12,6 +12,7 @@ import {
   type TenantUser,
   type FeatureCatalogItem,
   type LimitCatalogItem,
+  type PlanCatalogItem,
 } from "../../service/platformApi";
 import { formatDateTimeLondon } from "@/lib/dateUtils";
 
@@ -23,6 +24,8 @@ export default function TenantDetailPage() {
   const [detail, setDetail] = useState<TenantSubscriptionDetail | null>(null);
   const [features, setFeatures] = useState<FeatureCatalogItem[]>([]);
   const [limits, setLimits] = useState<LimitCatalogItem[]>([]);
+  const [plans, setPlans] = useState<PlanCatalogItem[]>([]);
+  const [subscriptionMode, setSubscriptionMode] = useState<"plan" | "custom">("plan");
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,8 +67,9 @@ export default function TenantDetailPage() {
       platformApi.getFeatureCatalog(false),
       platformApi.getLimitCatalog(false),
       platformApi.listTenantUsers(tenantId).catch(() => []),
+      platformApi.getPlanCatalog(true).catch(() => []),
     ])
-      .then(([t, sub, feats, lims, userList]) => {
+      .then(([t, sub, feats, lims, userList, planList]) => {
         if (t) {
           setTenant(t);
           setName(t.name || "");
@@ -83,10 +87,13 @@ export default function TenantDetailPage() {
         setFeatures(feats);
         setLimits(lims);
         setUsers(Array.isArray(userList) ? userList : []);
-        setPlanKey(sub.planKey || "starter");
+        setPlans(Array.isArray(planList) ? planList : []);
+        setPlanKey(sub.planKey || "");
         setSubscriptionStartDate(sub.startDate ? new Date(sub.startDate).toISOString().slice(0, 10) : "");
         setSubscriptionExpireDate(sub.expireDate ? new Date(sub.expireDate).toISOString().slice(0, 10) : "");
         setOverrides({ features: sub.overrides?.features || {}, limits: sub.overrides?.limits || {} });
+        // Use subscriptionType from API response
+        setSubscriptionMode(sub.subscriptionType === "custom" ? "custom" : "plan");
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
@@ -96,11 +103,12 @@ export default function TenantDetailPage() {
     if (!tenantId) return;
     setSaving(true);
     try {
-      const updated = await platformApi.updateTenantSubscription(tenantId, { planKey, overrides, startDate: subscriptionStartDate || null, expireDate: subscriptionExpireDate || null });
+      const updated = await platformApi.updateTenantSubscription(tenantId, { subscriptionType: "plan", planKey, overrides, startDate: subscriptionStartDate || null, expireDate: subscriptionExpireDate || null });
       setDetail(updated);
       setOverrides({ features: updated.overrides.features, limits: updated.overrides.limits });
       setSubscriptionStartDate(updated.startDate ? new Date(updated.startDate).toISOString().slice(0, 10) : "");
       setSubscriptionExpireDate(updated.expireDate ? new Date(updated.expireDate).toISOString().slice(0, 10) : "");
+      setSubscriptionMode("plan");
       setToast({ message: "Subscription saved" });
     } catch (e) {
       setToast({ message: e instanceof Error ? e.message : "Failed to save", error: true });
@@ -113,8 +121,29 @@ export default function TenantDetailPage() {
     if (!tenantId) return;
     setSaving(true);
     try {
-      await platformApi.updateTenant(tenantId, { name: name.trim(), companyName: companyName.trim(), email: email.trim(), phone: phone.trim(), billingAddress: billingAddress.trim(), billingEmail: billingEmail.trim(), billingAmount: billingAmount === "" ? null : Number(billingAmount), billingCycle, currency: currency.trim() || "GBP", status });
+      await platformApi.updateTenant(tenantId, { name: name.trim(), companyName: companyName.trim(), email: email.trim(), phone: phone.trim(), billingAddress: billingAddress.trim() });
       setToast({ message: "Tenant details saved" });
+      const t = await platformApi.getTenant(tenantId);
+      setTenant(t);
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : "Failed to save", error: true });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveCustomBilling = async () => {
+    if (!tenantId) return;
+    setSaving(true);
+    try {
+      // Save custom billing to tenant
+      await platformApi.updateTenant(tenantId, { billingEmail: billingEmail.trim(), billingAmount: billingAmount === "" ? null : Number(billingAmount), billingCycle, currency: currency.trim() || "GBP", status });
+      // Set subscriptionType to custom and clear planKey
+      const updated = await platformApi.updateTenantSubscription(tenantId, { subscriptionType: "custom", planKey: "", overrides, startDate: subscriptionStartDate || null, expireDate: subscriptionExpireDate || null });
+      setDetail(updated);
+      setPlanKey("");
+      setSubscriptionMode("custom");
+      setToast({ message: "Custom billing saved" });
       const t = await platformApi.getTenant(tenantId);
       setTenant(t);
     } catch (e) {
@@ -282,11 +311,6 @@ export default function TenantDetailPage() {
             <div><label className="block text-xs font-medium text-gray-700">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg" /></div>
             <div><label className="block text-xs font-medium text-gray-700">Phone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg" /></div>
             <div className="sm:col-span-2"><label className="block text-xs font-medium text-gray-700">Billing address</label><input value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg" /></div>
-            <div><label className="block text-xs font-medium text-gray-700">Billing email</label><input type="email" value={billingEmail} onChange={(e) => setBillingEmail(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg" /></div>
-            <div><label className="block text-xs font-medium text-gray-700">Billing amount</label><input type="number" min={0} step={0.01} value={billingAmount} onChange={(e) => setBillingAmount(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg" /></div>
-            <div><label className="block text-xs font-medium text-gray-700">Billing cycle</label><select value={billingCycle} onChange={(e) => setBillingCycle(e.target.value as "monthly" | "yearly")} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
-            <div><label className="block text-xs font-medium text-gray-700">Currency</label><select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg"><option value="GBP">GBP</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div>
-            <div><label className="block text-xs font-medium text-gray-700">Status</label><select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg"><option value="active">Active</option><option value="suspended">Suspended</option></select></div>
           </div>
           <div className="mt-4">
             <button onClick={handleSaveTenantDetails} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
@@ -381,15 +405,57 @@ export default function TenantDetailPage() {
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Subscription</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Plan</label><select value={planKey} onChange={(e) => setPlanKey(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2"><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Start date</label><input type="date" value={subscriptionStartDate} onChange={(e) => setSubscriptionStartDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Expire date</label><input type="date" value={subscriptionExpireDate} onChange={(e) => setSubscriptionExpireDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+          <div className="flex gap-4 mb-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="subscriptionMode"
+                checked={subscriptionMode === "plan"}
+                onChange={() => setSubscriptionMode("plan")}
+                className="w-4 h-4 text-orange-500"
+              />
+              <span className="text-sm font-medium text-gray-800">Select Plan</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="subscriptionMode"
+                checked={subscriptionMode === "custom"}
+                onChange={() => { setSubscriptionMode("custom"); setPlanKey(""); }}
+                className="w-4 h-4 text-orange-500"
+              />
+              <span className="text-sm font-medium text-gray-800">Custom Billing</span>
+            </label>
           </div>
+          {subscriptionMode === "plan" ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+                <select value={planKey} onChange={(e) => setPlanKey(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2">
+                  <option value="">Select a plan</option>
+                  {plans.map((p) => (
+                    <option key={p.planKey} value={p.planKey}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Start date</label><input type="date" value={subscriptionStartDate} onChange={(e) => setSubscriptionStartDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Expire date</label><input type="date" value={subscriptionExpireDate} onChange={(e) => setSubscriptionExpireDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Billing email</label><input type="email" value={billingEmail} onChange={(e) => setBillingEmail(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Billing amount</label><input type="number" min={0} step={0.01} value={billingAmount} onChange={(e) => setBillingAmount(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Billing cycle</label><select value={billingCycle} onChange={(e) => setBillingCycle(e.target.value as "monthly" | "yearly")} className="w-full border border-gray-300 rounded-lg px-3 py-2"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Currency</label><select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2"><option value="GBP">GBP</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label><select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2"><option value="active">Active</option><option value="suspended">Suspended</option></select></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Start date</label><input type="date" value={subscriptionStartDate} onChange={(e) => setSubscriptionStartDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Expire date</label><input type="date" value={subscriptionExpireDate} onChange={(e) => setSubscriptionExpireDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2" /></div>
+            </div>
+          )}
           <div className="mt-4">
-            <button onClick={handleSaveSubscription} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
+            <button onClick={subscriptionMode === "plan" ? handleSaveSubscription : handleSaveCustomBilling} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save subscription
+              {subscriptionMode === "plan" ? "Save subscription" : "Save custom billing"}
             </button>
           </div>
         </div>
