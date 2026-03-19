@@ -289,8 +289,8 @@ export default function PlanCatalogPage() {
                           const pm = p.priceMetadata as { monthly?: number; yearly?: number; currency?: string };
                           const cur = pm.currency ?? "";
                           const parts: string[] = [];
-                          if (pm.monthly != null && pm.monthly !== "") parts.push(`${pm.monthly} ${cur}/mo`);
-                          if (pm.yearly != null && pm.yearly !== "") parts.push(`${pm.yearly} ${cur}/yr`);
+                          if (pm.monthly != null) parts.push(`${pm.monthly} ${cur}/mo`);
+                          if (pm.yearly != null) parts.push(`${pm.yearly} ${cur}/yr`);
                           return parts.length ? parts.join(" · ") : "—";
                         })()
                       : "—"}
