@@ -213,8 +213,15 @@ export const platformApi = {
     const json = await res.json();
     if (!res.ok) throw new Error(json.message || "Failed to delete tenant");
   },
+  async checkSubdomain(subdomain: string): Promise<{ available: boolean }> {
+    const res = await fetch(`${API_BASE}/platform/tenants-check-subdomain/${encodeURIComponent(subdomain)}`, { headers: getPlatformAuthHeaders() });
+    const json = await res.json();
+    return json;
+  },
   async createTenant(body: {
     tenantSubdomain: string;
+    tenantId?: string;
+    tenantUrl?: string;
     name?: string;
     companyName?: string;
     contactEmail?: string;

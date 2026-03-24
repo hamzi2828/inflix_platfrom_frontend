@@ -71,6 +71,7 @@ export default function TenantsPage() {
               <tr>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-800">Name</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-800">Subdomain / URL</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-800">DB Name</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-800">Contact</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-800">Billing</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-800">Plan</th>
@@ -94,6 +95,9 @@ export default function TenantsPage() {
                     ) : (
                       "—"
                     )}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-gray-800">
+                    <span className="font-mono text-xs">tenant_{t.tenantId}</span>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-800">
                     {t.email || "—"}
@@ -215,11 +219,27 @@ function AddTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [plansLoading, setPlansLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [checkingSubdomain, setCheckingSubdomain] = useState(false);
   const [createFirstAdmin, setCreateFirstAdmin] = useState(false);
   const [firstAdminEmail, setFirstAdminEmail] = useState("");
   const [firstAdminPassword, setFirstAdminPassword] = useState("");
   const [firstAdminName, setFirstAdminName] = useState("");
   const subdomainNormalized = tenantSubdomain.trim().toLowerCase();
+
+  // Debounced uniqueness check on keyup
+  useEffect(() => {
+    setSubdomainAvailable(null);
+    if (!subdomainNormalized || !isValidSubdomain(subdomainNormalized)) return;
+    setCheckingSubdomain(true);
+    const timer = setTimeout(() => {
+      platformApi.checkSubdomain(subdomainNormalized)
+        .then((r) => setSubdomainAvailable(r.available))
+        .catch(() => setSubdomainAvailable(null))
+        .finally(() => setCheckingSubdomain(false));
+    }, 400);
+    return () => { clearTimeout(timer); setCheckingSubdomain(false); };
+  }, [subdomainNormalized]);
 
   const loadPlans = useCallback(() => {
     setPlansLoading(true);
@@ -262,10 +282,13 @@ function AddTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const subdomainPreview = subdomainNormalized
     ? `https://${subdomainNormalized}.${PREVIEW_DOMAIN}`
     : "";
+  const dbNamePreview = subdomainNormalized ? `tenant_${subdomainNormalized}` : "";
   const subdomainError =
     tenantSubdomain.trim() !== "" && !isValidSubdomain(tenantSubdomain)
       ? "3–30 characters, lowercase letters, numbers, hyphens only (no leading/trailing hyphen)"
-      : "";
+      : subdomainAvailable === false
+        ? "This subdomain is already taken"
+        : "";
 
   async function submit() {
     const displayName = (name || companyName || "").trim() || "New Tenant";
@@ -277,6 +300,10 @@ function AddTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
     }
     if (!isValidSubdomain(tenantSubdomain)) {
       setError("Subdomain must be 3–30 characters, lowercase letters, numbers, and hyphens only (cannot start or end with hyphen).");
+      return;
+    }
+    if (subdomainAvailable === false) {
+      setError("This subdomain is already taken. Choose a different one.");
       return;
     }
     if (createFirstAdmin) {
@@ -337,19 +364,30 @@ function AddTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
         <div className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-800">Subdomain (tenant name)</label>
-            <input
-              value={tenantSubdomain}
-              onChange={(e) => setTenantSubdomain(e.target.value.replace(/\s/g, ""))}
-              className={`w-full mt-1 px-3 py-2 border rounded-lg ${subdomainError ? "border-red-400 bg-red-50/50" : "border-gray-300"}`}
-              placeholder="acme"
-              aria-invalid={!!subdomainError}
-              aria-describedby={subdomainError ? "subdomain-error" : undefined}
-            />
+            <div className="relative">
+              <input
+                value={tenantSubdomain}
+                onChange={(e) => setTenantSubdomain(e.target.value.replace(/\s/g, ""))}
+                className={`w-full mt-1 px-3 py-2 border rounded-lg pr-8 ${subdomainError ? "border-red-400 bg-red-50/50" : subdomainAvailable === true ? "border-green-400" : "border-gray-300"}`}
+                placeholder="acme"
+                aria-invalid={!!subdomainError}
+                aria-describedby={subdomainError ? "subdomain-error" : undefined}
+              />
+              {subdomainNormalized && isValidSubdomain(subdomainNormalized) && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-sm">
+                  {checkingSubdomain ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : subdomainAvailable === true ? <Check className="h-4 w-4 text-green-600" /> : subdomainAvailable === false ? <span className="text-red-500 text-xs font-medium">Taken</span> : null}
+                </span>
+              )}
+            </div>
             {subdomainError && (
               <p id="subdomain-error" className="mt-1 text-xs text-red-600">{subdomainError}</p>
             )}
-            {subdomainPreview && (
-              <p className="mt-1 text-xs text-gray-700">Preview: <span className="font-mono text-gray-800">{subdomainPreview}</span></p>
+            {subdomainPreview && !subdomainError && (
+              <div className="mt-1 space-y-0.5">
+                <p className="text-xs text-gray-700">URL: <span className="font-mono text-gray-800">{subdomainPreview}</span></p>
+                <p className="text-xs text-gray-700">Tenant ID: <span className="font-mono text-gray-800">{subdomainNormalized}</span></p>
+                <p className="text-xs text-gray-700">DB name: <span className="font-mono text-gray-800">{dbNamePreview}</span></p>
+              </div>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
