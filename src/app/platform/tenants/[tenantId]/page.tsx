@@ -303,6 +303,14 @@ export default function TenantDetailPage() {
                 <span className="text-xs text-gray-600">Create an admin to open the tenant app.</span>
               )}
             </div>
+            <div className="mt-2">
+              <p className="text-xs font-medium text-gray-700 mb-1">Database name</p>
+              <input
+                value={`tenant_${tenantId}`}
+                readOnly
+                className="w-full sm:w-auto px-3 py-1.5 text-sm font-mono text-gray-800 bg-gray-100 border border-gray-200 rounded-lg cursor-default focus:outline-none"
+              />
+            </div>
             <p className="text-xs text-gray-700 mt-1">Subdomain is set when the tenant is created (Add tenant). It cannot be changed from this page.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

@@ -75,6 +75,7 @@ export interface TenantDetail {
   tenantId: string;
   tenantSubdomain?: string;
   tenantUrl?: string;
+  tenantDbName?: string;
   name: string;
   companyName: string;
   email: string;
