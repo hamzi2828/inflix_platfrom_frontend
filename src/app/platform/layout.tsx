@@ -5,6 +5,7 @@ import { usePlatformAuth } from "@/contexts/PlatformAuthContext";
 import { useEffect } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { Sidebar } from "../components/Sidebar";
 
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const { platformUser, loading } = usePlatformAuth();
@@ -27,35 +28,29 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" data-platform>
-      <div className="border-b border-gray-200 bg-white">
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-gray-800">
-            <Link href="/platform" className="text-orange-600 hover:underline">Platform</Link>
-            {pathname && pathname !== "/platform" && (
-              <>
-                <ChevronRight className="h-4 w-4" />
-                <span className="text-gray-700 capitalize">
-                  {pathname.replace("/platform/", "").split("/")[0]?.replace(/-/g, " ") || "Console"}
-                </span>
-              </>
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-1">
-            <h1 className="text-xl font-semibold text-gray-900">Platform Owner Console</h1>
-            <a
-              href={process.env.NEXT_PUBLIC_TENANT_APP_URL || "http://localhost:3000"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-orange-600 hover:underline"
-            >
-              Open Tenant App →
-            </a>
+    <div className="flex h-screen" data-platform>
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Breadcrumb header */}
+        <div className="border-b border-gray-200 bg-white shrink-0">
+          <div className="px-6 py-3">
+            <div className="flex items-center gap-2 text-sm text-gray-800">
+              <Link href="/platform" className="text-orange-600 hover:underline">Platform</Link>
+              {pathname && pathname !== "/platform" && (
+                <>
+                  <ChevronRight className="h-4 w-4" />
+                  <span className="text-gray-700 capitalize">
+                    {pathname.replace("/platform/", "").split("/")[0]?.replace(/-/g, " ") || "Console"}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {children}
+        {/* Page content */}
+        <main className="flex-1 overflow-auto bg-gray-50 p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

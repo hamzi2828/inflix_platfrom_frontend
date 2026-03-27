@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Package, Check, X as XIcon, Infinity } from "lucide-react";
 import {
   platformApi,
   type PlanCatalogItem,
@@ -10,196 +10,12 @@ import {
   type LimitCatalogItem,
 } from "../service/platformApi";
 
-function PlanFormModal({
-  plan,
-  featureCatalog,
-  limitCatalog,
-  onClose,
-  onSaved,
-}: {
-  plan: PlanCatalogItem | null;
-  featureCatalog: FeatureCatalogItem[];
-  limitCatalog: LimitCatalogItem[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const isEdit = !!plan;
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [planKey, setPlanKey] = useState(plan?.planKey ?? "");
-  const [name, setName] = useState(plan?.name ?? "");
-  const [description, setDescription] = useState(plan?.description ?? "");
-  const [monthly, setMonthly] = useState<number | "">(
-    plan?.priceMetadata && typeof plan.priceMetadata === "object" && "monthly" in plan.priceMetadata
-      ? (plan.priceMetadata as { monthly?: number }).monthly ?? ""
-      : ""
-  );
-  const [yearly, setYearly] = useState<number | "">(
-    plan?.priceMetadata && typeof plan.priceMetadata === "object" && "yearly" in plan.priceMetadata
-      ? (plan.priceMetadata as { yearly?: number }).yearly ?? ""
-      : ""
-  );
-  const [currency, setCurrency] = useState(
-    plan?.priceMetadata && typeof plan.priceMetadata === "object" && "currency" in plan.priceMetadata
-      ? (plan.priceMetadata as { currency?: string }).currency ?? "GBP"
-      : "GBP"
-  );
-  const [features, setFeatures] = useState<Record<string, boolean>>(plan?.features ?? {});
-  const [limits, setLimits] = useState<Record<string, number | null>>(plan?.limits ?? {});
-  const [isActive, setIsActive] = useState(plan?.isActive ?? true);
-
-  const setFeature = (key: string, value: boolean) => {
-    setFeatures((prev) => ({ ...prev, [key]: value }));
-  };
-  const setLimit = (key: string, value: number | null) => {
-    setLimits((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSaving(true);
-    try {
-      const priceMetadata =
-        monthly !== "" || yearly !== ""
-          ? {
-              ...(monthly !== "" ? { monthly: Number(monthly) } : {}),
-              ...(yearly !== "" ? { yearly: Number(yearly) } : {}),
-              currency: currency || "GBP",
-            }
-          : null;
-      if (isEdit) {
-        await platformApi.updatePlan(plan.planKey, { name, description, priceMetadata, features, limits, isActive });
-      } else {
-        if (!planKey.trim()) {
-          setError("Plan key is required");
-          setSaving(false);
-          return;
-        }
-        await platformApi.createPlan({
-          planKey: planKey.trim().toLowerCase(),
-          name: name || planKey.trim(),
-          description,
-          priceMetadata,
-          features,
-          limits,
-          isActive,
-        });
-      }
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900">{isEdit ? "Edit plan" : "Add plan"}</h3>
-          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-800" aria-label="Close">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plan key</label>
-              <input
-                type="text"
-                value={planKey}
-                onChange={(e) => setPlanKey(e.target.value)}
-                disabled={isEdit}
-                className="border border-gray-300 rounded-lg px-3 py-2 w-full font-mono text-sm disabled:bg-gray-100 disabled:text-gray-500"
-                placeholder="e.g. pro"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="e.g. Pro" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="Optional" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monthly price</label>
-              <input type="number" min={0} step={1} value={monthly} onChange={(e) => setMonthly(e.target.value === "" ? "" : Number(e.target.value))} className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Yearly price</label>
-              <input type="number" min={0} step={1} value={yearly} onChange={(e) => setYearly(e.target.value === "" ? "" : Number(e.target.value))} className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="0" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="GBP" />
-            </div>
-          </div>
-          {featureCatalog.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
-              <div className="flex flex-wrap gap-3">
-                {featureCatalog.map((f) => (
-                  <label key={f.key} className="flex items-center gap-2">
-                    <input type="checkbox" checked={features[f.key] ?? false} onChange={(e) => setFeature(f.key, e.target.checked)} className="rounded border-gray-300 text-orange-600 focus:ring-orange-500" />
-                    <span className="text-sm text-gray-700">{f.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-          {limitCatalog.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Limits</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {limitCatalog.map((l) => (
-                  <div key={l.key}>
-                    <label className="block text-xs font-medium text-gray-700 mb-0.5">{l.name}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={limits[l.key] ?? ""}
-                      onChange={(e) => setLimit(l.key, e.target.value === "" ? null : parseInt(e.target.value, 10))}
-                      className="border border-gray-300 rounded-lg px-2 py-1.5 w-full text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                      placeholder="Default"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded border-gray-300 text-orange-600 focus:ring-orange-500" />
-            <span className="text-sm text-gray-700">Active</span>
-          </label>
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 export default function PlanCatalogPage() {
   const [plans, setPlans] = useState<PlanCatalogItem[]>([]);
   const [featureCatalog, setFeatureCatalog] = useState<FeatureCatalogItem[]>([]);
   const [limitCatalog, setLimitCatalog] = useState<LimitCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalPlan, setModalPlan] = useState<PlanCatalogItem | null | "add">(null);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -236,7 +52,7 @@ export default function PlanCatalogPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-gray-800">
+      <div className="flex items-center justify-center py-20 gap-2 text-gray-500">
         <Loader2 className="h-5 w-5 animate-spin" /> Loading plans...
       </div>
     );
@@ -244,90 +60,169 @@ export default function PlanCatalogPage() {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+      <div className="max-w-xl mx-auto mt-12 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
         {error}
-        <Link href="/platform" className="block mt-2 text-orange-600 hover:underline">← Back to Platform</Link>
+        <Link href="/platform" className="block mt-2 text-orange-600 hover:underline">Back to Platform</Link>
       </div>
     );
   }
 
+  const formatPrice = (p: PlanCatalogItem) => {
+    if (!p.priceMetadata || typeof p.priceMetadata !== "object") return null;
+    const pm = p.priceMetadata as { monthly?: number; yearly?: number; currency?: string };
+    const sym = pm.currency === "EUR" ? "\u20AC" : pm.currency === "USD" ? "$" : "\u00A3";
+    return { monthly: pm.monthly, yearly: pm.yearly, sym, currency: pm.currency ?? "GBP" };
+  };
+
   return (
-    <div>
+    <div className="max-w-5xl mx-auto">
+      {/* Page header */}
       <div className="flex items-center justify-between mb-6">
-        <Link href="/platform" className="inline-flex items-center gap-1 text-gray-800 hover:text-orange-600">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Link>
-        <button type="button" onClick={() => setModalPlan("add")} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600">
-          <Plus className="h-4 w-4" /> Add plan
-        </button>
-      </div>
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">Plan Catalog</h2>
-          <p className="text-sm text-gray-800">Plans define default features and limits; tenants can override.</p>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex w-10 h-10 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm">
+            <Package className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Plan Catalog</h1>
+            <p className="text-sm text-gray-500">Plans define default features and limits; tenants can override.</p>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-100 border-b-2 border-gray-300">
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-800">Plan</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-800">Name</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-800">Price</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-800">Features (on)</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-800">Limits</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-gray-800">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plans.map((p) => (
-                <tr key={p._id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{p.planKey}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
-                  <td className="px-4 py-3 text-gray-800">
-                    {p.priceMetadata && typeof p.priceMetadata === "object"
-                      ? (() => {
-                          const pm = p.priceMetadata as { monthly?: number; yearly?: number; currency?: string };
-                          const cur = pm.currency ?? "";
-                          const parts: string[] = [];
-                          if (pm.monthly != null) parts.push(`${pm.monthly} ${cur}/mo`);
-                          if (pm.yearly != null) parts.push(`${pm.yearly} ${cur}/yr`);
-                          return parts.length ? parts.join(" · ") : "—";
-                        })()
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-800">
-                    {Object.entries(p.features || {}).filter(([, v]) => v).map(([k]) => k).join(", ") || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-800">
-                    {Object.entries(p.limits || {}).map(([k, v]) => (v != null ? `${k}: ${v}` : `${k}: —`)).join("; ") || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <button type="button" onClick={() => setModalPlan(p)} className="p-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600" title="Edit">
+        <Link
+          href="/platform/plan-catalog/add"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 font-medium shadow-sm transition-all text-sm"
+        >
+          <Plus className="h-4 w-4" /> Add Plan
+        </Link>
+      </div>
+
+      {/* Plan cards */}
+      {plans.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <Package className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 mb-4">No plans yet. Create your first plan to get started.</p>
+          <Link
+            href="/platform/plan-catalog/add"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" /> Add Plan
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {plans.map((p) => {
+            const price = formatPrice(p);
+            const enabledFeatures = Object.entries(p.features || {}).filter(([, v]) => v);
+            const disabledFeatures = Object.entries(p.features || {}).filter(([, v]) => !v);
+            const planLimits = Object.entries(p.limits || {});
+            const isInactive = !p.isActive;
+
+            return (
+              <div
+                key={p._id}
+                className={`bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md ${
+                  isInactive ? "border-gray-300 opacity-75" : "border-gray-200"
+                }`}
+              >
+                {/* Card header */}
+                <div className={`px-5 py-4 border-b border-gray-100 ${isInactive ? "bg-gray-50" : "bg-gradient-to-r from-indigo-50/60 to-white"}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-lg">{p.name}</h3>
+                      <span className="text-xs font-mono text-gray-400">{p.planKey}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isInactive && (
+                        <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full mr-1">Inactive</span>
+                      )}
+                      <Link
+                        href={`/platform/plan-catalog/${encodeURIComponent(p.planKey)}`}
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                        title="Edit"
+                      >
                         <Pencil className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => handleDelete(p.planKey)} disabled={deletingKey === p.planKey} className="p-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 disabled:opacity-50" title="Delete">
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(p.planKey)}
+                        disabled={deletingKey === p.planKey}
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors"
+                        title="Delete"
+                      >
                         {deletingKey === p.planKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  {p.description && <p className="text-sm text-gray-500 mt-1">{p.description}</p>}
+                </div>
+
+                {/* Pricing */}
+                <div className="px-5 py-3 border-b border-gray-100">
+                  {price ? (
+                    <div className="flex items-baseline gap-3">
+                      {price.monthly != null && (
+                        <div>
+                          <span className="text-2xl font-bold text-gray-900">{price.sym}{price.monthly}</span>
+                          <span className="text-sm text-gray-400"> /mo</span>
+                        </div>
+                      )}
+                      {price.yearly != null && (
+                        <div className="text-sm text-gray-500">
+                          {price.sym}{price.yearly}<span className="text-gray-400"> /yr</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">No pricing set</span>
+                  )}
+                </div>
+
+                {/* Features */}
+                <div className="px-5 py-3 border-b border-gray-100 flex-1">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Features</h4>
+                  {enabledFeatures.length === 0 && disabledFeatures.length === 0 ? (
+                    <p className="text-sm text-gray-400">None configured</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {enabledFeatures.map(([k]) => (
+                        <li key={k} className="flex items-center gap-2 text-sm">
+                          <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                          <span className="text-gray-700">{k.replace(/_/g, " ")}</span>
+                        </li>
+                      ))}
+                      {disabledFeatures.map(([k]) => (
+                        <li key={k} className="flex items-center gap-2 text-sm">
+                          <XIcon className="h-3.5 w-3.5 text-gray-300 shrink-0" />
+                          <span className="text-gray-400">{k.replace(/_/g, " ")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Limits */}
+                <div className="px-5 py-3">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Limits</h4>
+                  {planLimits.length === 0 ? (
+                    <p className="text-sm text-gray-400">None configured</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {planLimits.map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500">{k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim()}</span>
+                          {v != null ? (
+                            <span className="font-medium text-gray-800">{v.toLocaleString()}</span>
+                          ) : (
+                            <Infinity className="h-3.5 w-3.5 text-gray-400" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        {plans.length === 0 && (
-          <div className="px-4 py-8 text-center text-gray-800">No plans. Run the entitlements seed on the backend or add a plan above.</div>
-        )}
-      </div>
-      {modalPlan !== null && (
-        <PlanFormModal
-          plan={modalPlan === "add" ? null : modalPlan}
-          featureCatalog={featureCatalog}
-          limitCatalog={limitCatalog}
-          onClose={() => setModalPlan(null)}
-          onSaved={load}
-        />
       )}
     </div>
   );
