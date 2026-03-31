@@ -19,6 +19,7 @@ import {
   X,
   Menu,
   ExternalLink,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -60,6 +61,12 @@ const NAV_CONFIG: NavSection[] = [
     ],
   },
   {
+    label: "Monitoring",
+    items: [
+      { title: "Health Checker", path: "/platform/health-checker", icon: Activity },
+    ],
+  },
+  {
     label: "Settings",
     items: [
       { title: "Settings", path: "/platform/settings", icon: Settings },
@@ -72,6 +79,7 @@ const SECTION_ACCENT: Record<string, string> = {
   Main: "border-l-[6px] border-l-emerald-600",
   Management: "border-l-[6px] border-l-orange-600",
   Catalogs: "border-l-[6px] border-l-indigo-600",
+  Monitoring: "border-l-[6px] border-l-cyan-600",
   Settings: "border-l-[6px] border-l-slate-600",
 };
 
@@ -79,6 +87,7 @@ const SECTION_HEADER_CHIP: Record<string, string> = {
   Main: "bg-emerald-100/80 text-emerald-900 ring-1 ring-emerald-200/70",
   Management: "bg-orange-100/80 text-orange-900 ring-1 ring-orange-200/60",
   Catalogs: "bg-indigo-100/80 text-indigo-900 ring-1 ring-indigo-200/60",
+  Monitoring: "bg-cyan-100/80 text-cyan-900 ring-1 ring-cyan-200/60",
   Settings: "bg-slate-200/80 text-slate-800 ring-1 ring-slate-300/70",
 };
 
@@ -86,6 +95,7 @@ const SECTION_ITEM_ICON: Record<string, string> = {
   Main: "text-emerald-600/85 group-hover:text-emerald-700",
   Management: "text-orange-600/85 group-hover:text-orange-700",
   Catalogs: "text-indigo-600/85 group-hover:text-indigo-700",
+  Monitoring: "text-cyan-600/85 group-hover:text-cyan-700",
   Settings: "text-slate-600/90 group-hover:text-slate-800",
 };
 

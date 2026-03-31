@@ -328,4 +328,119 @@ export const platformApi = {
     if (!res.ok) throw new Error(json.message || "Failed to delete");
     return json;
   },
+
+  // ─── Health Checker ───
+  async getHealthCheckerTenants(): Promise<{ tenantId: string; name: string; companyName: string; status: string }[]> {
+    const res = await fetch(`${API_BASE}/platform/health-checker/tenants`, { headers: getPlatformAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load tenants");
+    const json = await res.json();
+    return json.data ?? [];
+  },
+  async getHealthCheckerSummary(tenantId: string, from?: string, to?: string): Promise<HealthCheckerSummary> {
+    const params = new URLSearchParams({ tenantId });
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const res = await fetch(`${API_BASE}/platform/health-checker/summary?${params}`, { headers: getPlatformAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load summary");
+    const json = await res.json();
+    return json.data;
+  },
+  async getHealthCheckerEndpoints(tenantId: string, from?: string, to?: string): Promise<HealthCheckerEndpoint[]> {
+    const params = new URLSearchParams({ tenantId });
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const res = await fetch(`${API_BASE}/platform/health-checker/endpoints?${params}`, { headers: getPlatformAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load endpoints");
+    const json = await res.json();
+    return json.data ?? [];
+  },
+  async getHealthCheckerSlow(tenantId: string, from?: string, to?: string, limit = 20): Promise<HealthCheckerSlowRequest[]> {
+    const params = new URLSearchParams({ tenantId, limit: String(limit) });
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const res = await fetch(`${API_BASE}/platform/health-checker/slow?${params}`, { headers: getPlatformAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load slow requests");
+    const json = await res.json();
+    return json.data ?? [];
+  },
+  async getHealthCheckerUsers(tenantId: string, from?: string, to?: string): Promise<HealthCheckerUser[]> {
+    const params = new URLSearchParams({ tenantId });
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const res = await fetch(`${API_BASE}/platform/health-checker/users?${params}`, { headers: getPlatformAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load user stats");
+    const json = await res.json();
+    return json.data ?? [];
+  },
+  async getHealthCheckerRecent(tenantId: string, limit = 100, level?: string): Promise<HealthCheckerRecentRequest[]> {
+    const params = new URLSearchParams({ tenantId, limit: String(limit) });
+    if (level) params.set("level", level);
+    const res = await fetch(`${API_BASE}/platform/health-checker/recent?${params}`, { headers: getPlatformAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load recent requests");
+    const json = await res.json();
+    return json.data ?? [];
+  },
 };
+
+// ─── Health Checker Types ───
+export interface HealthCheckerSummary {
+  totalRequests: number;
+  avgDuration: number;
+  maxDuration: number;
+  minDuration: number;
+  errorCount: number;
+  serverErrorCount: number;
+  errorRate: number;
+  uniqueUsers: number;
+  uniqueEndpoints: number;
+  firstRequest: string | null;
+  lastRequest: string | null;
+}
+
+export interface HealthCheckerEndpoint {
+  method: string;
+  url: string;
+  hits: number;
+  avgDuration: number;
+  minDuration: number;
+  maxDuration: number;
+  errorCount: number;
+  errorRate: number;
+  lastHit: string;
+  uniqueUsers: number;
+}
+
+export interface HealthCheckerSlowRequest {
+  _id: string;
+  method: string;
+  url: string;
+  status: number;
+  duration: number;
+  user: string;
+  timestamp: string;
+}
+
+export interface HealthCheckerUser {
+  user: string;
+  totalRequests: number;
+  avgDuration: number;
+  errorCount: number;
+  errorRate: number;
+  lastActive: string;
+  endpointCount: number;
+}
+
+export interface HealthCheckerRecentRequest {
+  _id: string;
+  method: string;
+  url: string;
+  status: number;
+  duration: number;
+  tenant: string;
+  user: string;
+  ip: string;
+  level: string;
+  error: string;
+  userAgent: string;
+  timestamp: string;
+}
