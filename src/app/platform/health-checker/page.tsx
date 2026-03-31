@@ -128,25 +128,83 @@ export default function HealthCheckerPage() {
     if (showRefresh) setRefreshing(true); else setLoading(true);
     const { from, to } = getDateRange();
     try {
-      const [s, e, sl, u, r] = await Promise.all([
-        platformApi.getHealthCheckerSummary(selectedTenant, from, to),
-        platformApi.getHealthCheckerEndpoints(selectedTenant, from, to),
-        platformApi.getHealthCheckerSlow(selectedTenant, from, to, 20),
-        platformApi.getHealthCheckerUsers(selectedTenant, from, to),
-        platformApi.getHealthCheckerRecent(selectedTenant, 200, recentFilter === "ALL" ? undefined : recentFilter),
-      ]);
-      setSummary(s);
-      setEndpoints(e);
-      setSlowRequests(sl);
-      setUsers(u);
-      setRecentRequests(r);
+      if (selectedTenant === "__all__") {
+        // Fetch from every tenant in parallel, then merge
+        const ids = tenants.map((t) => t.tenantId);
+        const results = await Promise.all(
+          ids.map(async (tid) => {
+            try {
+              const [s, e, sl, u, r] = await Promise.all([
+                platformApi.getHealthCheckerSummary(tid, from, to),
+                platformApi.getHealthCheckerEndpoints(tid, from, to),
+                platformApi.getHealthCheckerSlow(tid, from, to, 20),
+                platformApi.getHealthCheckerUsers(tid, from, to),
+                platformApi.getHealthCheckerRecent(tid, 100, recentFilter === "ALL" ? undefined : recentFilter),
+              ]);
+              return { tid, s, e, sl, u, r };
+            } catch { return null; }
+          })
+        );
+        const valid = results.filter(Boolean) as { tid: string; s: HealthCheckerSummary; e: HealthCheckerEndpoint[]; sl: HealthCheckerSlowRequest[]; u: HealthCheckerUser[]; r: HealthCheckerRecentRequest[] }[];
+
+        // Merge summaries
+        const merged: HealthCheckerSummary = {
+          totalRequests: 0, avgDuration: 0, maxDuration: 0, minDuration: Infinity,
+          errorCount: 0, serverErrorCount: 0, errorRate: 0,
+          uniqueUsers: 0, uniqueEndpoints: 0, firstRequest: null, lastRequest: null,
+        };
+        let totalDuration = 0;
+        for (const v of valid) {
+          merged.totalRequests += v.s.totalRequests;
+          totalDuration += v.s.avgDuration * v.s.totalRequests;
+          merged.maxDuration = Math.max(merged.maxDuration, v.s.maxDuration);
+          merged.minDuration = Math.min(merged.minDuration, v.s.minDuration || Infinity);
+          merged.errorCount += v.s.errorCount;
+          merged.serverErrorCount += v.s.serverErrorCount;
+          merged.uniqueUsers += v.s.uniqueUsers;
+          merged.uniqueEndpoints += v.s.uniqueEndpoints;
+        }
+        merged.avgDuration = merged.totalRequests > 0 ? Math.round((totalDuration / merged.totalRequests) * 10) / 10 : 0;
+        merged.errorRate = merged.totalRequests > 0 ? Math.round((merged.errorCount / merged.totalRequests) * 1000) / 10 : 0;
+        if (merged.minDuration === Infinity) merged.minDuration = 0;
+
+        // Merge endpoints (tag with tenant)
+        const allEndpoints = valid.flatMap((v) => v.e.map((ep) => ({ ...ep, url: `[${v.tid}] ${ep.url}` })));
+        // Merge slow (tag + sort)
+        const allSlow = valid.flatMap((v) => v.sl.map((s) => ({ ...s, url: `[${v.tid}] ${s.url}` })))
+          .sort((a, b) => b.duration - a.duration).slice(0, 20);
+        // Merge users (tag)
+        const allUsers = valid.flatMap((v) => v.u.map((u) => ({ ...u, user: u.user === "-" ? `[${v.tid}] anonymous` : `[${v.tid}] ${u.user}` })));
+        // Merge recent (sort by time)
+        const allRecent = valid.flatMap((v) => v.r.map((r) => ({ ...r, tenant: v.tid })))
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 200);
+
+        setSummary(merged);
+        setEndpoints(allEndpoints);
+        setSlowRequests(allSlow);
+        setUsers(allUsers);
+        setRecentRequests(allRecent);
+      } else {
+        const [s, e, sl, u, r] = await Promise.all([
+          platformApi.getHealthCheckerSummary(selectedTenant, from, to),
+          platformApi.getHealthCheckerEndpoints(selectedTenant, from, to),
+          platformApi.getHealthCheckerSlow(selectedTenant, from, to, 20),
+          platformApi.getHealthCheckerUsers(selectedTenant, from, to),
+          platformApi.getHealthCheckerRecent(selectedTenant, 200, recentFilter === "ALL" ? undefined : recentFilter),
+        ]);
+        setSummary(s);
+        setEndpoints(e);
+        setSlowRequests(sl);
+        setUsers(u);
+        setRecentRequests(r);
+      }
     } catch {
       // silent
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedTenant, getDateRange, recentFilter]);
+  }, [selectedTenant, tenants, getDateRange, recentFilter]);
 
   useEffect(() => {
     if (selectedTenant) loadData();
@@ -637,16 +695,22 @@ function TenantSelect({
       >
         <Database className="h-4 w-4 text-cyan-600 shrink-0" />
         <span className="flex-1 truncate text-gray-800">
-          {selected
-            ? <>{selected.name || selected.tenantId}{selected.companyName && selected.companyName !== selected.name ? <span className="text-gray-400"> ({selected.companyName})</span> : ""}</>
-            : <span className="text-gray-400">Select tenant...</span>
+          {value === "__all__"
+            ? <span className="font-medium">All Tenants</span>
+            : selected
+              ? <>{selected.name || selected.tenantId}{selected.companyName && selected.companyName !== selected.name ? <span className="text-gray-400"> ({selected.companyName})</span> : ""}</>
+              : <span className="text-gray-400">Select tenant...</span>
           }
         </span>
-        {selected && (
+        {value === "__all__" ? (
+          <span className="text-xs font-medium text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded shrink-0">
+            {tenants.length} DBs
+          </span>
+        ) : selected ? (
           <span className="text-xs font-mono text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded shrink-0">
             tenant_{selected.tenantId}
           </span>
-        )}
+        ) : null}
         <ChevronDown className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -673,6 +737,24 @@ function TenantSelect({
 
           {/* Options list */}
           <div className="max-h-[300px] overflow-y-auto">
+            {/* All Tenants option */}
+            {(!search.trim() || "all tenants".includes(search.toLowerCase())) && (
+              <button
+                type="button"
+                onClick={() => { onChange("__all__"); setOpen(false); setSearch(""); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors border-b border-gray-100 ${
+                  value === "__all__" ? "bg-cyan-50" : "hover:bg-gray-50"
+                }`}
+              >
+                <Globe className="h-4 w-4 text-cyan-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className={`font-medium ${value === "__all__" ? "text-cyan-800" : "text-gray-800"}`}>All Tenants</span>
+                  <div className="text-xs text-gray-400 mt-0.5">Aggregate data from all {tenants.length} databases</div>
+                </div>
+                {value === "__all__" && <Check className="h-4 w-4 text-cyan-600 shrink-0" />}
+              </button>
+            )}
+
             {filtered.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-gray-400">No tenants match &ldquo;{search}&rdquo;</div>
             ) : (
